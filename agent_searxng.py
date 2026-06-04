@@ -56,7 +56,7 @@ def search(
         safesearch: Safe search level (0, 1, 2) - default: 1
     """
     # put the URL where you can reach your SearXNG installation here
-    search_url = "http://raspi:8888/search"
+    search_url = "http://localhost:8888/search"
 
     params = {
         "q": query,
