@@ -19,10 +19,47 @@ Some [any-agent](https://github.com/mozilla-ai/any-agent) examples for the OxML 
 
 `agent_config.py` の `get_agent_args()` が、モデル ID・API ベース URL・API キー・プロンプトを
 `.env` ファイル／環境変数／CLI 引数から統一的に読み込みます。
-デフォルトモデルはローカル llamafile (`Qwen3.5-0.8B-Q8_0`) です。
 
 ```
-python agent_birthday.py                          # デフォルトプロンプトで実行
-python agent_birthday.py "..." --model gpt-4o    # プロンプトとモデルを上書き
-python agent_birthday.py --port 8081              # ローカルサーバーのポート指定
+uv run agent_birthday.py                          # デフォルトプロンプトで実行
+uv run agent_birthday.py "..." --model gpt-4o    # プロンプトとモデルを上書き
+uv run agent_birthday.py --port 8081              # ローカルサーバーのポート指定
 ```
+
+`.env` ファイルで設定する場合（`.env.example` を参考に作成）：
+
+```
+MODEL_ID=openai:Qwen2.5-7B-Instruct-Q8_0
+API_BASE=http://localhost:8080/v1
+API_KEY=whatever
+```
+
+## LLM バックエンド — llama.cpp (Windows / Vulkan)
+
+Intel GPU（Arc 等）を活用する場合、Windows ネイティブの llama.cpp + Vulkan バックエンドを使います。
+WSL2 側からは `networkingMode=mirrored` 設定により `localhost:8080` として接続できます。
+
+**モデルのダウンロード（PowerShell）：**
+
+```powershell
+huggingface-cli download bartowski/Qwen2.5-7B-Instruct-GGUF --include "Qwen2.5-7B-Instruct-Q8_0.gguf" --local-dir 'C:\Users\takay\MyWork\llama.cpp\'
+```
+
+**サーバー起動（PowerShell）：**
+
+```powershell
+C:\Users\takay\MyWork\llama.cpp\llama-b9500-bin-win-vulkan-x64\llama-server.exe -m 'C:\Users\takay\MyWork\llama.cpp\Qwen2.5-7B-Instruct-Q8_0.gguf' -ngl 99 --port 8080
+```
+
+`-ngl 99` で全レイヤーを GPU にオフロードします。起動後、`http://localhost:8080/v1/models` で動作確認できます。
+
+## SearXNG のセットアップ
+
+`agent_searxng.py` の実行には SearXNG インスタンスが必要です。
+Docker Compose で起動できます：
+
+```bash
+docker compose up -d
+```
+
+`searxng/settings.yml` に JSON フォーマットが有効化された設定が含まれています。
