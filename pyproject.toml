@@ -9,4 +9,5 @@ dependencies = [
     "markdownify",
     "openai<2.0",
     "ddgs>=9.14.4",
+    "duckduckgo-search>=8.1.1",
 ]

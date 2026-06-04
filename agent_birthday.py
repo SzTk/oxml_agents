@@ -43,7 +43,7 @@ agent = AnyAgent.create(
         model_id=model_id,
         api_key=api_key,
         api_base=api_base,
-        instructions="""You must use the available tools to find an answer.""",
+        instructions="""You must use the available tools to find an answer. You surely have the answer in the files in the current directory, so you should use the tools to find it. You can see csv file in the current directory.""",
         tools=[scan_current_dir, read_file],
     ),
 )
