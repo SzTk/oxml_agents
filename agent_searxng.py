@@ -2,11 +2,12 @@ import httpx
 import json
 import re
 import requests
-import sys
 
 from any_agent import AgentConfig, AnyAgent
 from markdownify import markdownify
 from requests.exceptions import RequestException
+
+from agent_config import get_agent_args
 
 def visit_webpage(url: str, timeout: int = 30) -> str:
     """Visits a webpage at the given url and returns its content as a markdown string. Use this to browse webpages.
@@ -112,21 +113,19 @@ def search(
         raise Exception(f"Error performing search: {e}")
 
 
+model_id, api_base, api_key, prompt = get_agent_args("""
+Who are the speakers for OxML 2026 MLx Cases?
+""")
+
 agent = AnyAgent.create(
     "tinyagent",
     AgentConfig(
-        model_id="llamafile:whatever",
-        api_base="http://localhost:8080",
+        model_id=model_id,
+        api_key=api_key,
+        api_base=api_base,
         instructions="""You must use the available tools to find an answer.""",
         tools=[search, visit_webpage],
     ),
 )
 
-prompt = sys.argv[1] if len(sys.argv) > 1 else """
-Who are the speakers for OxML 2026 MLx Cases?
-"""
 agent_trace = agent.run(prompt)
-
-agent_trace = agent.run(
-    ""
-)

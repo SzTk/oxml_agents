@@ -1,6 +1,7 @@
-import sys
 from any_agent import AgentConfig, AnyAgent
 from pathlib import Path
+
+from agent_config import get_agent_args
 
 def read_file(file_name: str) -> str:
     """Read the contents of the given `file_name`.
@@ -34,16 +35,17 @@ def scan_current_dir(pattern: str) -> list[str]:
     return str(files_list)
 
 
+model_id, api_base, api_key, prompt = get_agent_args("When was Davide Eynard born?")
+
 agent = AnyAgent.create(
     "tinyagent",
     AgentConfig(
-        model_id="llamafile:Qwen3.5-9B",
-        api_key="whatever",
-        api_base="http://localhost:8080",
+        model_id=model_id,
+        api_key=api_key,
+        api_base=api_base,
         instructions="""You must use the available tools to find an answer.""",
         tools=[scan_current_dir, read_file],
     ),
 )
 
-prompt = sys.argv[1] if len(sys.argv) > 1 else "When was Davide Eynard born?"
 agent_trace = agent.run(prompt)

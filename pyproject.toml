@@ -8,4 +8,5 @@ dependencies = [
     "mcpd",
     "markdownify",
     "openai<2.0",
+    "ddgs>=9.14.4",
 ]
