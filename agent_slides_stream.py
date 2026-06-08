@@ -1,7 +1,9 @@
-from any_agent import AgentConfig, AnyAgent
+from any_agent import AgentConfig
 from any_agent.tools import search_web, visit_webpage
+from any_llm.utils.aio import run_async_in_sync
 
 from agent_config import get_agent_args
+from streaming_tinyagent import StreamingTinyAgent
 
 SIMPLE_INSTRUCTION = "Use the tools, please."
 
@@ -22,15 +24,20 @@ model_id, api_base, api_key, prompt = get_agent_args(
     "Which are the most used agentic frameworks? Do at most one web search"
 )
 
-agent = AnyAgent.create(
-    "tinyagent",
-    AgentConfig(
-        model_id=model_id,
-        api_key=api_key,
-        api_base=api_base,
-        instructions=BETTER_INSTRUCTION,
-        tools=[search_web, visit_webpage],
-    ),
-)
 
-agent_trace = agent.run(prompt)
+async def main():
+    agent = StreamingTinyAgent(
+        AgentConfig(
+            model_id=model_id,
+            api_key=api_key,
+            api_base=api_base,
+            instructions=BETTER_INSTRUCTION,
+            tools=[search_web, visit_webpage],
+        )
+    )
+    await agent._load_agent()
+    result = await agent.run_stream_async(prompt)
+    print(f"\n\nFinal: {result}")
+
+
+run_async_in_sync(main())

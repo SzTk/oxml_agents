@@ -1,7 +1,10 @@
-from any_agent import AgentConfig, AnyAgent
+from any_agent import AgentConfig
+from any_llm.utils.aio import run_async_in_sync
 from pathlib import Path
 
 from agent_config import get_agent_args
+from streaming_tinyagent import StreamingTinyAgent
+
 
 def read_file(file_name: str) -> str:
     """Read the contents of the given `file_name`.
@@ -11,18 +14,13 @@ def read_file(file_name: str) -> str:
 
     Returns:
         The contents of `file_name`.
-
-    Raises:
-        ValueError: For the following cases:
-            - If the path to the file is not allowed.
     """
-    file_path = Path(file_name)
-    return file_path.read_text()
+    return Path(file_name).read_text()
 
 
 def scan_current_dir(pattern: str) -> list[str]:
     """Scans the current directory for files satisfying the provided pattern.
-    
+
     Args:
         pattern: The pattern used to filter files in the current directory (e.g. "*.txt"
         for text files, "*.py" for python files, "*.*" for all files)
@@ -30,9 +28,7 @@ def scan_current_dir(pattern: str) -> list[str]:
     Returns:
         A string representing the list of filenames that satisfy the provided pattern
     """
-    current_dir = Path(".")
-    files_list = [str(f) for f in current_dir.glob(pattern)]
-    return str(files_list)
+    return str([str(f) for f in Path(".").glob(pattern)])
 
 
 SIMPLE_INSTRUCTION = "You must use the available tools to find an answer."
@@ -52,15 +48,20 @@ If no matching file is found, try broader patterns such as "*.txt" or "*.*".\
 
 model_id, api_base, api_key, prompt = get_agent_args("When was Davide Eynard born?")
 
-agent = AnyAgent.create(
-    "tinyagent",
-    AgentConfig(
-        model_id=model_id,
-        api_key=api_key,
-        api_base=api_base,
-        instructions=BETTER_INSTRUCTION,
-        tools=[scan_current_dir, read_file],
-    ),
-)
 
-agent_trace = agent.run(prompt)
+async def main():
+    agent = StreamingTinyAgent(
+        AgentConfig(
+            model_id=model_id,
+            api_key=api_key,
+            api_base=api_base,
+            instructions=BETTER_INSTRUCTION,
+            tools=[scan_current_dir, read_file],
+        )
+    )
+    await agent._load_agent()
+    result = await agent.run_stream_async(prompt)
+    print(f"\n\nFinal: {result}")
+
+
+run_async_in_sync(main())

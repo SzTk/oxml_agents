@@ -1,10 +1,11 @@
 import asyncio
 import os
 
-from any_agent import AgentConfig, AnyAgent
+from any_agent import AgentConfig
 from any_agent.config import MCPStdio
 
 from agent_config import get_agent_args
+from streaming_tinyagent import StreamingTinyAgent
 
 SIMPLE_INSTRUCTION = "You must use the available tools to find an answer."
 
@@ -28,8 +29,7 @@ Look into my Joplin notes and tell me what notes I have.
 
 
 async def main():
-    async with await AnyAgent.create_async(
-        "tinyagent",
+    agent = StreamingTinyAgent(
         AgentConfig(
             model_id=model_id,
             api_key=api_key,
@@ -47,9 +47,12 @@ async def main():
                     env={"JOPLIN_TOKEN": os.environ["JOPLIN_TOKEN"]},
                 )
             ],
-        ),
-    ) as agent:
-        return await agent.run_async(prompt)
+        )
+    )
+    await agent._load_agent()
+    async with agent:
+        result = await agent.run_stream_async(prompt)
+    print(f"\n\nFinal: {result}")
 
 
-agent_trace = asyncio.run(main())
+asyncio.run(main())
