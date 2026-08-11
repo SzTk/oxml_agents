@@ -14,6 +14,7 @@ Some [any-agent](https://github.com/mozilla-ai/any-agent) examples for the OxML 
 | `agent_joplin.py` | Joplin MCP サーバー (MCPStdio) | Joplin ノートアプリの Wiki を検索し、llamafile GPU 対応の修正内容を回答する |
 | `agent_zim.py` | zim-mcp-server (MCPStdio) | Zim デスクトップ Wiki を検索し、Denny Vrandecic の誕生日を探す |
 | `agent_searxng.py` | `search` (SearXNG), `visit_webpage` | セルフホスト検索エンジン SearXNG を使って OxML 2026 のスピーカー情報を調べる |
+| `agent_router.py` | `scan_current_dir`/`read_file`, `visit_webpage`, `search`（カテゴリ別） | ユーザー入力を files/webpage/search に分類し、対応する専門エージェントに委譲する（ルーターパターン） |
 
 ## 共通設定
 
