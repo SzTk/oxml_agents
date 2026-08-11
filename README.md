@@ -15,6 +15,7 @@ Some [any-agent](https://github.com/mozilla-ai/any-agent) examples for the OxML 
 | `agent_zim.py` | zim-mcp-server (MCPStdio) | Zim デスクトップ Wiki を検索し、Denny Vrandecic の誕生日を探す |
 | `agent_searxng.py` | `search` (SearXNG), `visit_webpage` | セルフホスト検索エンジン SearXNG を使って OxML 2026 のスピーカー情報を調べる |
 | `agent_duckduckgo.py` | `search` (DuckDuckGo/ddgs), `visit_webpage` | DuckDuckGo（ddgs）を使って OxML 2026 のスピーカー情報を調べる。SearXNGがブロックされやすい問題への軽量な代替として試作 |
+| `agent_brave.py` | `search` (Brave Search API), `visit_webpage` | Brave Search API を使って OxML 2026 のスピーカー情報を調べる。公式APIのため ddgs 版よりブロックに強く、無料枠（月2,000クエリ）でデモ用途には十分 |
 | `agent_router.py` | `scan_current_dir`/`read_file`, `visit_webpage`, `search`（カテゴリ別） | ユーザー入力を files/webpage/search に分類し、対応する専門エージェントに委譲する（ルーターパターン） |
 | `agent_parallel.py` | なし（テキストのみ） | コードレビューを security/performance/readability の3専門エージェントで並列評価し、synthesizer が1つのレポートに統合する（Parallelizationパターン） |
 
@@ -66,3 +67,10 @@ docker compose up -d
 ```
 
 `searxng/settings.yml` に JSON フォーマットが有効化された設定が含まれています。
+
+## Brave Search API のセットアップ
+
+`agent_brave.py` の実行には Brave Search API のAPIキーが必要です。
+
+1. https://brave.com/search/api/ でアカウント登録し、APIキーを発行する（無料枠: 月2,000クエリ）。
+2. `.env` に `BRAVE_API_KEY=<発行されたキー>` を追加する（`.env.example` を参照）。
