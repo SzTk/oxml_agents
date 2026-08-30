@@ -33,12 +33,19 @@ uv run agent_birthday.py --port 8081              # ローカルサーバーの�
 `.env` ファイルで設定する場合（`.env.example` を参考に作成）：
 
 ```
-MODEL_ID=openai:Qwen2.5-7B-Instruct-Q8_0
-API_BASE=http://localhost:8080/v1
-API_KEY=whatever
+MODEL_ID=anthropic:claude-sonnet-4-5
+API_BASE=https://claude-workshop-relay.eyeofjapetus.workers.dev
+API_KEY=workshop-0822
 ```
 
-## LLM バックエンド — llama.cpp (Windows / Vulkan)
+## LLM バックエンド — Cloudflare Agent Worker プロキシ（デフォルト）
+
+デモは Cloudflare Worker でホストされた Anthropic 互換の relay（`/v1/messages`、OpenAI 形式のメッセージにも対応）経由で
+Claude を呼び出します。`any-llm-sdk` の `anthropic` プロバイダーが公式 Anthropic SDK クライアントを使うため、
+`x-api-key` / `anthropic-version` ヘッダーは自動的に付与されます。`MODEL_ID` は `anthropic:<model>` の形式で指定してください
+（`API_BASE` に `/v1` は付けません — SDK 側が自動的に付加します）。
+
+## LLM バックエンド — llama.cpp (Windows / Vulkan、代替)
 
 Intel GPU（Arc 等）を活用する場合、Windows ネイティブの llama.cpp + Vulkan バックエンドを使います。
 WSL2 側からは `networkingMode=mirrored` 設定により `localhost:8080` として接続できます。
