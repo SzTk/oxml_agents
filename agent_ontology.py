@@ -56,3 +56,49 @@ def _constraint_description() -> str:
     for a, b in get_disjoint_pairs(ONTOLOGY_GRAPH):
         lines.append(f"- {_local_name(a)} と {_local_name(b)}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 2. オントロジー問い合わせツール
+# ---------------------------------------------------------------------------
+def query_family_ontology(query: str) -> str:
+    """家系図オントロジーに対してSPARQLで問い合わせる。
+
+    Args:
+        query: 自然文の質問。"parent" または "inverse" というキーワードを
+            含む場合に対応するSPARQLクエリを実行する。
+
+    Returns:
+        SPARQLクエリの実行結果を整形した文字列。
+    """
+    q_lower = query.lower()
+
+    if "parent" in q_lower:
+        sparql = """
+        PREFIX fam: <http://example.org/family#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        SELECT ?prop ?card WHERE {
+            fam:Parent owl:equivalentClass ?restriction .
+            ?restriction owl:onProperty ?prop ;
+                         owl:minCardinality ?card .
+        }
+        """
+        rows = list(ONTOLOGY_GRAPH.query(sparql))
+        if not rows:
+            return "オントロジーに該当する情報が見つかりませんでした。"
+        prop, card = rows[0]
+        return f"Parent は {_local_name(str(prop))} を {card} 個以上持つ Person です。"
+
+    if "inverse" in q_lower:
+        sparql = """
+        PREFIX fam: <http://example.org/family#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        SELECT ?a ?b WHERE { ?a owl:inverseOf ?b . }
+        """
+        rows = list(ONTOLOGY_GRAPH.query(sparql))
+        if not rows:
+            return "オントロジーに該当する情報が見つかりませんでした。"
+        a, b = rows[0]
+        return f"{_local_name(str(a))} の逆関係は {_local_name(str(b))} です。"
+
+    return "オントロジーに該当する情報が見つかりませんでした。"
