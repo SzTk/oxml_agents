@@ -1,6 +1,6 @@
 # オントロジー制約コールバックパターン（agent_ontology.py）
 
-any-agent の `before_llm_call`/`after_llm_call` コールバックを使って、ドメインオントロジー（家系図、Turtle形式）の制約をLLM呼び出しに注入し、応答内の事実を rdflib で検証するサンプルです。`references/ontology/ontology_callback_demo.py` の擬似コード（Perplexityとの調査対話から生成）を、このリポジトリの実際の `any-agent`（1.18.0）API と `agent_config.get_agent_args()` に沿って実装し直したものが `agent_ontology.py` です。
+any-agent の `before_llm_call`/`after_llm_call`（LLM呼び出しの前後）と `before_tool_execution`/`after_tool_execution`（ツール実行の前後）のコールバックを使って、ドメインオントロジー（家系図、Turtle形式）の制約をLLM呼び出しに注入し、応答内の事実を rdflib で検証するサンプルです。`references/ontology/ontology_callback_demo.py` の擬似コード（Perplexityとの調査対話から生成）を、このリポジトリの実際の `any-agent`（1.18.0）API と `agent_config.get_agent_args()` に沿って実装し直したものが `agent_ontology.py` です。
 
 ## アーキテクチャ
 
@@ -14,13 +14,14 @@ flowchart TD
 
     GRAPH -.->|"get_disjoint_pairs()"| CB1
     GRAPH -.->|"SPARQL SELECT"| TOOL
+    GRAPH -.->|"get_disjoint_pairs() (ASK検証用)"| CB2
 
     subgraph AGENT["AnyAgent (tinyagent, tool_choice=required)"]
         A["agent.run(prompt)"]
         CB1["OntologyConstraintCallback<br/>before_llm_call:<br/>system message に制約を注入<br/>(context.sharedで二重注入を防止)"]
         LLM["LLM呼び出し"]
         FINAL["final_answer ツール呼び出し<br/>(最終回答は通常ここに乗る。<br/>message.content は空になりがち)"]
-        CB2["OntologyValidationCallback<br/>after_llm_call + before/after_tool_execution:<br/>final_answerツールの出力(または応答content)から<br/>```turtle ブロックを抽出しASKクエリで検証"]
+        CB2["OntologyValidationCallback<br/>after_llm_call + before/after_tool_execution:<br/>final_answerツールの出力(または応答content)から<br/>turtleブロックを抽出しASKクエリで検証"]
         TOOL["query_family_ontology<br/>(ツール, SPARQL SELECT)"]
 
         A --> CB1 --> LLM
@@ -48,6 +49,42 @@ uv run agent_ontology.py "カスタムプロンプト"
 ```
 
 `model_id` / `api_base` / `api_key` は他のデモと同じく `agent_config.get_agent_args()`（`.env` / CLI引数）から取得します。
+
+## サンプル実行
+
+実LLMに対して動作確認済みの3パターンです。
+
+### デフォルトプロンプト（引数なし）
+
+```bash
+uv run agent_ontology.py
+```
+
+デフォルトプロンプト（「John は Male であり、Mary の Parent です。Mary は John の何ですか？」）に対して、
+制約注入は1回だけ行われ（`[OntologyConstraintCallback] オントロジー制約をプロンプトに注入しました`）、
+`hasParent`/`hasChild` の逆関係からMaryがJohnのChildであることを正しく導いた回答が返り、
+検証側は違反なしと判定します（`[OntologyValidationCallback] オントロジー違反は検出されませんでした`）。
+
+### 違反を誘発するプロンプト
+
+```bash
+uv run agent_ontology.py "Johnは男性でも女性でもあります。JohnはMaryの親です。この設定に基づいて、Johnについて分かっていることを、最後にturtleブロックで事実を書きながら説明してください。"
+```
+
+LLMがJohnを `fam:Male` と `fam:Female` の両方に属するものとしてturtleブロックに書き出すと、
+`OntologyValidationCallback` が `owl:disjointWith` 違反を検出します
+（`[OntologyValidationCallback] 違反検出: ['Male と Female を同時に持つ個体が見つかりました']`）。
+最終回答でもLLM自身がこの矛盾（互いに素なクラスへの同時所属）について説明します。
+
+### ツール呼び出しを伴うプロンプト
+
+```bash
+uv run agent_ontology.py "hasChildの逆の関係は何かオントロジーに問い合わせて教えてください。"
+```
+
+LLMが `query_family_ontology` ツールを呼び出し、SPARQLクエリの実行結果として
+「hasParent の逆関係は hasChild です。」という文字列（ハードコードではなく `ONTOLOGY_GRAPH` から
+`owl:inverseOf` を検索した実際の問い合わせ結果）が返り、最終回答はこれをそのまま使って説明します。
 
 ## 次のステップの例
 
