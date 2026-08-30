@@ -2,7 +2,9 @@
 any-agent でオントロジー制約をコールバックとして注入する最小デモ
 
 オントロジー（家系図ドメイン）の制約を before_llm_call でプロンプトに注入し、
-after_llm_call で応答内の Turtle スニペットを rdflib で検証する。
+LLMの応答（after_llm_call）または最終回答を運ぶ final_answer ツールの
+呼び出し結果（before_tool_execution/after_tool_execution）から
+Turtle スニペットを抽出して rdflib で検証する。
 
 参考: references/ontology/ontology_callback_demo.py（Perplexity生成の擬似コード）。
 本ファイルは実際にインストールされている any-agent==1.18.0 のAPIに合わせて
@@ -78,6 +80,18 @@ def query_family_ontology(query: str) -> str:
     """
     q_lower = query.lower()
 
+    if "inverse" in q_lower:
+        sparql = """
+        PREFIX fam: <http://example.org/family#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        SELECT ?a ?b WHERE { ?a owl:inverseOf ?b . }
+        """
+        rows = list(ONTOLOGY_GRAPH.query(sparql))
+        if not rows:
+            return "オントロジーに該当する情報が見つかりませんでした。"
+        a, b = rows[0]
+        return f"{_local_name(str(a))} の逆関係は {_local_name(str(b))} です。"
+
     if "parent" in q_lower:
         sparql = """
         PREFIX fam: <http://example.org/family#>
@@ -93,18 +107,6 @@ def query_family_ontology(query: str) -> str:
             return "オントロジーに該当する情報が見つかりませんでした。"
         prop, card = rows[0]
         return f"Parent は {_local_name(str(prop))} を {card} 個以上持つ Person です。"
-
-    if "inverse" in q_lower:
-        sparql = """
-        PREFIX fam: <http://example.org/family#>
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        SELECT ?a ?b WHERE { ?a owl:inverseOf ?b . }
-        """
-        rows = list(ONTOLOGY_GRAPH.query(sparql))
-        if not rows:
-            return "オントロジーに該当する情報が見つかりませんでした。"
-        a, b = rows[0]
-        return f"{_local_name(str(a))} の逆関係は {_local_name(str(b))} です。"
 
     return "オントロジーに該当する情報が見つかりませんでした。"
 
@@ -243,13 +245,13 @@ class OntologyValidationCallback(Callback):
 
     def before_tool_execution(self, context, *args, **kwargs):
         request = args[0] if args else {}
-        context.shared["_last_tool_name"] = (
+        context.shared["ontology_last_tool_name"] = (
             request.get("name") if isinstance(request, dict) else None
         )
         return context
 
     def after_tool_execution(self, context, *args, **kwargs):
-        if context.shared.get("_last_tool_name") != "final_answer":
+        if context.shared.get("ontology_last_tool_name") != "final_answer":
             return context
 
         output = args[0] if args else ""
