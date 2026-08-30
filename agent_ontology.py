@@ -152,3 +152,76 @@ def find_violations(snippet_ttl: str) -> list[str]:
                 f"{_local_name(a)} と {_local_name(b)} を同時に持つ個体が見つかりました"
             )
     return violations
+
+
+# ---------------------------------------------------------------------------
+# 4. コールバック
+# ---------------------------------------------------------------------------
+from any_agent.callbacks.base import Callback  # noqa: E402
+
+
+class OntologyConstraintCallback(Callback):
+    """LLM呼び出し前にオントロジー制約をシステムプロンプトに注入する。
+
+    `context.shared["ontology_injected"]` で注入済みかを管理し、同一の
+    `agent.run()` 内でツール呼び出しループにより before_llm_call が複数回
+    呼ばれても、システムプロンプトに二重・多重注入しないようにする。
+    """
+
+    def before_llm_call(self, context, *args, **kwargs):
+        if context.shared.get("ontology_injected"):
+            return context
+
+        messages = kwargs.get("messages")
+        if not messages or messages[0].get("role") != "system":
+            return context
+
+        ontology_prompt = f"""
+以下のオントロジー制約に厳密に従って回答してください。
+
+{ONTOLOGY_TTL}
+
+{_constraint_description()}
+
+回答の最後に、あなたが使った・推論した個体についての事実を、以下のような
+```turtle
+ex:Mary a fam:Female .
+```
+形式の ```turtle フェンスコードブロックで追記してください。
+オントロジーに明示されていない関係を推論してはいけません。
+"""
+        messages[0]["content"] = ontology_prompt + "\n\n" + messages[0]["content"]
+        context.shared["ontology_injected"] = True
+        print("[OntologyConstraintCallback] オントロジー制約をプロンプトに注入しました")
+        return context
+
+
+class OntologyValidationCallback(Callback):
+    """LLM応答後にTurtleスニペットを抽出し、disjoint違反を検証する。"""
+
+    def after_llm_call(self, context, *args, **kwargs):
+        response = args[0]
+        text = ""
+        if response.choices and response.choices[0].message:
+            text = response.choices[0].message.content or ""
+
+        snippet = extract_turtle_block(text)
+        if snippet is None:
+            print(
+                "[OntologyValidationCallback] 検証可能なTurtleスニペットが"
+                "見つかりませんでした"
+            )
+            return context
+
+        try:
+            violations = find_violations(snippet)
+        except Exception as e:
+            print(f"[OntologyValidationCallback] Turtleスニペットのパースに失敗しました: {e}")
+            return context
+
+        context.shared["ontology_violations"] = violations
+        if violations:
+            print(f"[OntologyValidationCallback] 違反検出: {violations}")
+        else:
+            print("[OntologyValidationCallback] オントロジー違反は検出されませんでした")
+        return context
