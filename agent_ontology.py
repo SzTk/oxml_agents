@@ -12,7 +12,12 @@ after_llm_call で応答内の Turtle スニペットを rdflib で検証する�
 
 import re
 
+from any_agent import AgentConfig, AnyAgent
+from any_agent.callbacks import ConsolePrintSpan
+from any_agent.callbacks.base import Callback
 from rdflib import Graph
+
+from agent_config import get_agent_args
 
 # ---------------------------------------------------------------------------
 # 1. オントロジー定義（Turtle）
@@ -157,7 +162,6 @@ def find_violations(snippet_ttl: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # 4. コールバック
 # ---------------------------------------------------------------------------
-from any_agent.callbacks.base import Callback  # noqa: E402
 
 
 class OntologyConstraintCallback(Callback):
@@ -225,3 +229,31 @@ class OntologyValidationCallback(Callback):
         else:
             print("[OntologyValidationCallback] オントロジー違反は検出されませんでした")
         return context
+
+
+# ---------------------------------------------------------------------------
+# 5. エージェント設定と実行
+# ---------------------------------------------------------------------------
+model_id, api_base, api_key, prompt = get_agent_args(
+    "John は Male であり、Mary の Parent です。Mary は John の何ですか？"
+)
+
+agent = AnyAgent.create(
+    "tinyagent",
+    AgentConfig(
+        model_id=model_id,
+        api_key=api_key,
+        api_base=api_base,
+        instructions="あなたは家系図オントロジーに基づいて質問に答えるアシスタントです。",
+        tools=[query_family_ontology],
+        callbacks=[
+            OntologyConstraintCallback(),
+            OntologyValidationCallback(),
+            ConsolePrintSpan(),
+        ],
+    ),
+)
+
+trace = agent.run(prompt)
+print("\n=== 最終回答 ===")
+print(trace.final_output)
