@@ -39,7 +39,7 @@ flowchart TD
 - `before_llm_call` の `kwargs["messages"]` は、実行中のLLM呼び出しに使われるものと同一のlistオブジェクトです。インプレースで書き換えることで実際のプロンプトに反映されます（再代入では反映されません）。
 - `context.shared` を使って「このrunで既に注入済みか」を記録し、ツール呼び出しループで `before_llm_call` が複数回呼ばれても制約テキストが多重に注入されないようにしています。
 - 検証はLLM自身に応答末尾で ```turtle``` ブロックとして事実を書かせ、それをrdflibでオントロジーと合成して `ASK` クエリで矛盾を検出する方式です。厳密なOWL推論（owlready2/HermiT等）ではなく、素なクラスの同時所属のような明示的な制約違反を検出する軽量な検証です。
-- `OntologyValidationCallback` は当初 `after_llm_call`（`message.content`）だけを見ていましたが、実LLMでの検証（Task 7）で「一度も違反を検出できない」ことが判明しました。原因は、any-agentの `TinyAgent` が既定で `tool_choice="required"` で動くため、LLMの最終回答が常に `final_answer` というツールの呼び出しとして返り、`message.content` には入らないためです。**コールバックを「どのフック点に置くか」は、プロンプトへの書き込み（`before_llm_call`一箇所で足りる）と、応答の読み取り（実行系がテキストをどの経路で運ぶか次第で複数のフックが必要になりうる）とで対称ではない**、という教訓を示す実例です。修正後は `before_tool_execution`/`after_tool_execution` も併用し、`final_answer` ツールの出力を検証することで解決しています。
+- `OntologyValidationCallback` は当初 `after_llm_call`（`message.content`）だけを見ていましたが、実際にLLMを使って動かして確認したところ「一度も違反を検出できない」ことが判明しました。原因は、any-agentの `TinyAgent` が既定で `tool_choice="required"` で動くため、LLMの最終回答が常に `final_answer` というツールの呼び出しとして返り、`message.content` には入らないためです。**コールバックを「どのフック点に置くか」は、プロンプトへの書き込み（`before_llm_call`一箇所で足りる）と、応答の読み取り（実行系がテキストをどの経路で運ぶか次第で複数のフックが必要になりうる）とで対称ではない**、という教訓を示す実例です。修正後は `before_tool_execution`/`after_tool_execution` も併用し、`final_answer` ツールの出力を検証することで解決しています。
 
 ## 実行方法
 
@@ -52,7 +52,7 @@ uv run agent_ontology.py "カスタムプロンプト"
 
 ## サンプル実行
 
-実LLMに対して動作確認済みの3パターンです。
+実際にLLMを使って動かした際の代表的な挙動を3パターン紹介します。LLMの応答は決定的ではないため、特に「違反を誘発するプロンプト」の結果は実行のたびに変わり得ます。
 
 ### デフォルトプロンプト（引数なし）
 
@@ -75,6 +75,7 @@ LLMがJohnを `fam:Male` と `fam:Female` の両方に属するものとしてtu
 `OntologyValidationCallback` が `owl:disjointWith` 違反を検出します
 （`[OntologyValidationCallback] 違反検出: ['Male と Female を同時に持つ個体が見つかりました']`）。
 最終回答でもLLM自身がこの矛盾（互いに素なクラスへの同時所属）について説明します。
+（ただしLLMがこの矛盾した設定をそのまま両方の事実として書き出すとは限らず、一方の事実だけを採用して矛盾のないturtleブロックを書く場合もあります。その場合は `[OntologyValidationCallback] オントロジー違反は検出されませんでした` と出力されますが、これは制約が読み取られ考慮されていることの別の現れであり、異常ではありません。）
 
 ### ツール呼び出しを伴うプロンプト
 
