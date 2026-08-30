@@ -102,3 +102,53 @@ def query_family_ontology(query: str) -> str:
         return f"{_local_name(str(a))} の逆関係は {_local_name(str(b))} です。"
 
     return "オントロジーに該当する情報が見つかりませんでした。"
+
+
+# ---------------------------------------------------------------------------
+# 3. LLM応答からのTurtleスニペット抽出・検証
+#    (any-agent / LLM に依存しない純粋関数)
+# ---------------------------------------------------------------------------
+TURTLE_BLOCK_RE = re.compile(r"```turtle\s*\n(.*?)```", re.DOTALL)
+
+_SNIPPET_PREFIXES = (
+    "@prefix fam: <http://example.org/family#> .\n"
+    "@prefix ex: <http://example.org/individuals#> .\n"
+)
+
+
+def extract_turtle_block(text: str) -> str | None:
+    """応答テキストから ```turtle フェンスコードブロックの中身を取り出す。
+
+    見つからない場合は None を返す。
+    """
+    match = TURTLE_BLOCK_RE.search(text)
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def find_violations(snippet_ttl: str) -> list[str]:
+    """スニペットをオントロジーと合成し、disjointクラス違反を検出する。
+
+    Args:
+        snippet_ttl: LLMが出力したTurtleスニペット（prefix宣言は省略可）。
+
+    Returns:
+        違反を説明する文字列のリスト（空リストなら違反なし）。
+
+    Raises:
+        Exception: スニペットがTurtleとしてパースできない場合。
+            呼び出し側で捕捉することを前提とする。
+    """
+    merged = Graph()
+    merged += ONTOLOGY_GRAPH
+    merged.parse(data=_SNIPPET_PREFIXES + snippet_ttl, format="turtle")
+
+    violations = []
+    for a, b in get_disjoint_pairs(ONTOLOGY_GRAPH):
+        ask = f"ASK {{ ?x a <{a}> , <{b}> . }}"
+        if bool(merged.query(ask)):
+            violations.append(
+                f"{_local_name(a)} と {_local_name(b)} を同時に持つ個体が見つかりました"
+            )
+    return violations
