@@ -18,6 +18,7 @@ Some [any-agent](https://github.com/mozilla-ai/any-agent) examples for the OxML 
 | `agent_brave.py` | `search` (Brave Search API), `visit_webpage` | Brave Search API を使って OxML 2026 のスピーカー情報を調べる。公式APIのため ddgs 版よりブロックに強く、無料枠（月2,000クエリ）でデモ用途には十分 |
 | `agent_router.py` | `scan_current_dir`/`read_file`, `visit_webpage`, `search`（カテゴリ別） | ユーザー入力を files/webpage/search に分類し、対応する専門エージェントに委譲する（ルーターパターン） |
 | `agent_parallel.py` | なし（テキストのみ） | コードレビューを security/performance/readability の3専門エージェントで並列評価し、synthesizer が1つのレポートに統合する（Parallelizationパターン） |
+| `agent_ontology.py` | `query_family_ontology`（SPARQL） | 家系図オントロジー（Turtle）の制約をコールバックでLLM呼び出しに注入し、応答内のTurtleスニペットをrdflibで検証する（オントロジー制約コールバックパターン） |
 
 ## 共通設定
 
