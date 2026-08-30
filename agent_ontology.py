@@ -201,7 +201,35 @@ ex:Mary a fam:Female .
 
 
 class OntologyValidationCallback(Callback):
-    """LLM応答後にTurtleスニペットを抽出し、disjoint違反を検証する。"""
+    """LLM応答・最終回答からTurtleスニペットを抽出し、disjoint違反を検証する。
+
+    TinyAgentは既定で tool_choice="required" のため、LLMの最終回答は
+    message.content ではなく final_answer ツールの呼び出し経由で返る。
+    そのため after_llm_call（message.content 向け）に加えて
+    before_tool_execution/after_tool_execution（final_answer ツール向け）
+    もフックし、どちらの経路でもTurtleスニペットを見逃さないようにする。
+    """
+
+    def _validate_text(self, context, text: str) -> None:
+        snippet = extract_turtle_block(text)
+        if snippet is None:
+            print(
+                "[OntologyValidationCallback] 検証可能なTurtleスニペットが"
+                "見つかりませんでした"
+            )
+            return
+
+        try:
+            violations = find_violations(snippet)
+        except Exception as e:
+            print(f"[OntologyValidationCallback] Turtleスニペットのパースに失敗しました: {e}")
+            return
+
+        context.shared["ontology_violations"] = violations
+        if violations:
+            print(f"[OntologyValidationCallback] 違反検出: {violations}")
+        else:
+            print("[OntologyValidationCallback] オントロジー違反は検出されませんでした")
 
     def after_llm_call(self, context, *args, **kwargs):
         response = args[0]
@@ -209,25 +237,23 @@ class OntologyValidationCallback(Callback):
         if response.choices and response.choices[0].message:
             text = response.choices[0].message.content or ""
 
-        snippet = extract_turtle_block(text)
-        if snippet is None:
-            print(
-                "[OntologyValidationCallback] 検証可能なTurtleスニペットが"
-                "見つかりませんでした"
-            )
+        if text:
+            self._validate_text(context, text)
+        return context
+
+    def before_tool_execution(self, context, *args, **kwargs):
+        request = args[0] if args else {}
+        context.shared["_last_tool_name"] = (
+            request.get("name") if isinstance(request, dict) else None
+        )
+        return context
+
+    def after_tool_execution(self, context, *args, **kwargs):
+        if context.shared.get("_last_tool_name") != "final_answer":
             return context
 
-        try:
-            violations = find_violations(snippet)
-        except Exception as e:
-            print(f"[OntologyValidationCallback] Turtleスニペットのパースに失敗しました: {e}")
-            return context
-
-        context.shared["ontology_violations"] = violations
-        if violations:
-            print(f"[OntologyValidationCallback] 違反検出: {violations}")
-        else:
-            print("[OntologyValidationCallback] オントロジー違反は検出されませんでした")
+        output = args[0] if args else ""
+        self._validate_text(context, str(output))
         return context
 
 
